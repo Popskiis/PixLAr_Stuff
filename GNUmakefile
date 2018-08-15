@@ -1,7 +1,8 @@
 CXXFLAGS += -I. $(shell root-config --cflags) -g
 LDFLAGS += $(shell root-config --libs) -g
 
-PROGRAMS = deltaRayParser stitchingAlgorithm
+PROGRAMS = deltaRayParser stitchingAlgorithm stitchingAlgorithmTest
+
 
 all:		clean $(PROGRAMS)
 

@@ -99,6 +99,7 @@ int main()
 	bool wantPictures = false;
 
 //	Open and read TTree from anaTree file
+	// original file is tracks.root
 	TFile* f = TFile::Open("tracks.root");
 		if(f == 0) {
 			std::cout << "Could not open the requested file.\n";
@@ -149,7 +150,7 @@ int main()
 //	 LOOP HERE THRU VECTOR
 
 while( myReader.Next() ) {
-	if(*grabEntry != 36) continue;
+	if(*grabEntry != 315) continue;
 
 		pointCluster allPoints, oldPoints;
 
