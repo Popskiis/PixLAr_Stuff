@@ -39,6 +39,7 @@ struct Point
 	double q;
 	double cluster_id;
 	double entry;
+	double event;
 };
 
 
@@ -107,7 +108,7 @@ int main()
 		}
 
 //	double values used in for loop later to write TTree
-	double tempX[100000], tempY[100000], tempZ[100000], tempQ[100000], tempID[100000];		int tempEntry, nHits;
+	double tempX[100000], tempY[100000], tempZ[100000], tempQ[100000], tempID[100000];		int tempEvent, tempEntry, nHits;
 	double centX, centY, centZ;		int centID;
 
 
@@ -127,6 +128,7 @@ int main()
 		treeTest.Branch("sp_charge", tempQ, "sp_charge[nHits]/D");
 		treeTest.Branch("cluster_id", tempID, "cluster_id[nHits]/D");
 		treeTest.Branch("entry", &tempEntry, "entry/I");
+		treeTest.Branch("event", &tempEvent, "event/I");
 
 
 
@@ -139,15 +141,9 @@ int main()
 		TTreeReaderArray<double> grabZPos(myReader, "sp_z");
 		TTreeReaderArray<int> getQ(myReader, "sp_charge");
 		TTreeReaderValue<int> grabEntry(myReader, "entry");
-
-//		TTreeReaderArray<int> grabQ(myReader, "sp_charge");
-
-
-//		temporary entry set to event 4430016 (690) for testing. will replace with whatever later
-//		myReader.SetEntry( 690 );
+		TTreeReaderValue<int> grabEvent(myReader, "event");
 
 
-//	 LOOP HERE THRU VECTOR
 
 while( myReader.Next() ) {
 	if(*grabEntry != 315) continue;
@@ -166,6 +162,7 @@ while( myReader.Next() ) {
 				tempPoint.z = grabZPos[iPoint];		
 				tempPoint.cluster_id = iPoint;
 				tempPoint.entry = *grabEntry;
+				tempPoint.event = *grabEvent;
 				allPoints.push_back(tempPoint);
 				oldPoints.push_back(tempPoint);
 			}
@@ -283,11 +280,14 @@ while( myReader.Next() ) {
 				<< "===============================================================================\n\n";
 
 
-	int done = 0;
+
 	int movenum = 0;
 	int moveThis = 0;
+	bool done = false;
 	bool firstTime = true;
 	bool allFinished = false;
+	
+	
 //	we just keep doing the code here until we are done!
 	while( !done )
 	{
@@ -323,7 +323,7 @@ while( myReader.Next() ) {
 				std::cout << "\n========================================================================================================" <<
 				"=============================\n 						CLUSTERING DONE 		\n======================================================"
 				<< "===============================================================================\n\n";
-				done = 1; // we are now done!
+				done = true; // we are now done!
 				break;
 			}else myClusterFamily = newClusterFamily;
 		}
@@ -366,6 +366,7 @@ std::cout << "\n==================================== DONE ======================
 //======================================= Fill our TTree with our new Data! ========================================================
 			nHits = *getHits;
 			tempEntry = *grabEntry;
+			tempEvent = *grabEvent;
 			int pointShift = 0;
 //			filling TTree branches here using for loop and temp xyz values.	
 			for (int iCluster = 0; iCluster < myClusterFamily.size(); ++iCluster)
@@ -834,7 +835,7 @@ void findBestClusterMoveAllPoints( const Point &moveCent, const familyClusters &
 
 // 7 z 14 y
 PCAResults endPoints = DoPCA( myCluster );
-printf( "End Points:  ( %f, %f, %f )    &&    ( %f, %f, %f ) \n", endPoints.endPoints.first(0), endPoints.endPoints.first(1), endPoints.endPoints.first(2), endPoints.endPoints.second(0), endPoints.endPoints.second(1), endPoints.endPoints.second(2) );
+// printf( "End Points:  ( %f, %f, %f )    &&    ( %f, %f, %f ) \n", endPoints.endPoints.first(0), endPoints.endPoints.first(1), endPoints.endPoints.first(2), endPoints.endPoints.second(0), endPoints.endPoints.second(1), endPoints.endPoints.second(2) );
 
 
 //	loop through each combination of moving 0, +/- 1, and +/- 2 ROI in y and z direction for pair of centroids passed in function

@@ -39,12 +39,16 @@ using namespace std;
 #define euler 2.71828
 #define cal_factor 0.0000385
 
+// make a delta ray class and store all of the points here. Also make a function which will find the closest point in the muon track and 
+//		add it to the vector???
+
 struct Point {
 	float x;
 	float y;
 	float z;
 	float q;
 };
+
 struct PCAResults {
 	TVector3 centroid;
 	pair<TVector3,TVector3> endPoints;
@@ -52,6 +56,7 @@ struct PCAResults {
 	TVector3 eVals;
 	vector<TVector3> eVecs;
 };
+
 struct TrkPoint{
 	int c;
 	int cid;
@@ -95,6 +100,7 @@ void sameCluster( TrkPoint &p1, TrkPoint &p2 );
 vector<double> Unit_Vec_NO(double x1,double x2,double y1,double y2,double z1,double z2);
 double dotProdFunc(double x1,double x2,double y1,double y2,double z1,double z2);
 vector<double> CrossProd(double x1,double x2,double y1,double y2,double z1,double z2);
+void setCID( track_def &eliminate, int newCID );
 
 
 struct by_y { 
@@ -104,8 +110,50 @@ struct by_y {
 	}
 };
 
+class newDelta {
+	public: 
+		superTrack finalDeltas;
+		int numPoints = 0;
+		
+		void storeDelta( track_def delta ) {
+			track_def tempStorage;
+			for (int j = 0; j < delta.size(); j++)
+			{
+				//~ cout << "CID: " << delta[j].cid << endl;
+				if ( delta[j].cid == 5 )
+				{
+					++numPoints;
+					tempStorage.push_back( delta[j] );
+				}
+			}
+			
+			if ( tempStorage.size() != 0)
+			{
+				finalDeltas.push_back( tempStorage );
+			}
+			
+		};
+		
+		void LOG() {
+			cout << "\n==========\nBEGIN LOG\n==========\n\n"
+			<< "Final number of passing delta rays: " << finalDeltas.size() << endl
+			<< "Total number of points: " << numPoints << endl << endl;
+			
+				
+			for (int iRay = 0; iRay < finalDeltas.size(); iRay++)
+			{
+				cout << "Ray " << iRay+1 << ": \n"
+				<< "  " << finalDeltas[iRay].size() << " points "<< endl;
+			}
+			
+			cout << "\n==========\nEND LOG\n==========\n\n";
 
-// void deltaRayParser()
+		};
+		
+};
+
+
+
 int main()
 {
 //Parameters
@@ -156,7 +204,7 @@ TFile* g = TFile::Open("deltaRays.root", "RECREATE");
 
 // myReader.SetEntry( 8 );
 while( myReader.Next() ) {
-	if( *grabEntry != 36 ) continue;
+	if( *grabEntry != 315 ) continue;
 
 	cout << "Entry num: " << *grabEntry << endl;
 	cout << "Total points: " << getX.GetSize() << endl;
@@ -488,7 +536,7 @@ for(int i = 0; i < points_gd.size(); ++i){
 /////////////////////////////////////////////////////////
 
 
-printf( " First point: ( %f, %f, %f ) 		Last Point: ( %f, %f, %f )\n", ord_trk[0].x, ord_trk[0].y, ord_trk[0].z,  ord_trk[ord_trk.size() - 1].x,  ord_trk[ord_trk.size() - 1].y,  ord_trk[ord_trk.size() - 1].z );
+printf( " Muon First point: ( %f, %f, %f ) 		Muon Last Point: ( %f, %f, %f )\n", ord_trk[0].x, ord_trk[0].y, ord_trk[0].z,  ord_trk[ord_trk.size() - 1].x,  ord_trk[ord_trk.size() - 1].y,  ord_trk[ord_trk.size() - 1].z );
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 // RECLUSTERING DELTA RAY CANDIDATES & DOING CUTS ///////////////////////////////////////////////
@@ -501,15 +549,17 @@ printf( " First point: ( %f, %f, %f ) 		Last Point: ( %f, %f, %f )\n", ord_trk[0
 	}
 
 // now we can cluster points close to eachother
+	double max_distance = 1.0;
 	for (int clusterPoint = 0; clusterPoint < delta_points.size(); clusterPoint++) {
 		for (int otherPoint = 0; otherPoint < delta_points.size(); otherPoint++) {
 			
-			// initial clustering
-			if ( Pythagoras( delta_points[clusterPoint].x,  delta_points[otherPoint].x,   delta_points[clusterPoint].y,   delta_points[otherPoint].y,   delta_points[clusterPoint].z,   delta_points[otherPoint].z ) < 0.8 ){
+			// initial clustering thresh was 0.8 initially
+			if ( Pythagoras( delta_points[clusterPoint].x,  delta_points[otherPoint].x,   delta_points[clusterPoint].y,   delta_points[otherPoint].y,   delta_points[clusterPoint].z,   delta_points[otherPoint].z ) < max_distance ){
 				sameCluster( delta_points[clusterPoint], delta_points[otherPoint] );			
 			}
 		}
 	}
+	
 
 
 			superTrack deltaClusters;
@@ -534,49 +584,66 @@ printf( " First point: ( %f, %f, %f ) 		Last Point: ( %f, %f, %f )\n", ord_trk[0
 				}
 			}
 
+	std::cout << "\n\n~~> Number of initial clusters: " << deltaClusters.size() << "\n\n";
 
 
 superTrack tempCompare = deltaClusters;
 int passingDeltaRays = 0;
 // do cuts for everything now in the delta ray vector
 	for (int i = 0; i < deltaClusters.size(); i++) {
+		bool done = false;
 		// if the cluster is too small we omit as candidate
 		if ( deltaClusters[i].size() <= 3 ) {
-			for (int allPoints = 0; allPoints < deltaClusters[i].size(); allPoints++) {
-				deltaClusters[i][allPoints].cid = 10;
-			}
-		}else{ bool firstPassingPoint = true;
+			setCID( deltaClusters[i], 10);
+		}else{
 		// loop all other clusters
 		for (int j = 0; j < deltaClusters.size(); j++) {
+			if(done) break;
 			// if not same cluster
 			if ( deltaClusters[i][0].cid != tempCompare[j][0].cid ) {
-				//loop all points in both clusters
 				for (int thisPoint = 0; thisPoint < deltaClusters[i].size(); thisPoint++) {
+					if(done) break;
+					// if within 5cm of either end of the track, cut it
+					if ( deltaClusters[i][thisPoint].y > (ord_trk[0].y - 5) || deltaClusters[i][thisPoint].y < (ord_trk[ ord_trk.size() - 1 ].y + 5) )  {
+						//~ deltaClusters[i][thisPoint].cid = 10;
+						//~ continue;
+						setCID( deltaClusters[i], 10 );
+						done = true;
+						break;
+					}
+					
 					for (int otherPoint = 0; otherPoint < deltaClusters[j].size(); otherPoint++) {
-						// if any points are within 5cm of eachother then we cut it
+						// if any points are within 5cm of another cluster then we cut it
 						if (   Pythagoras( deltaClusters[i][thisPoint].x,  deltaClusters[j][otherPoint].x,   deltaClusters[i][thisPoint].y,   deltaClusters[j][otherPoint].y,   deltaClusters[i][thisPoint].z,   deltaClusters[j][otherPoint].z ) <= 5.0 ) {
-							deltaClusters[i][thisPoint].cid = 10;
-							continue;
-						}
-						// if within 5cm of either end of the track, cut it
-						if ( deltaClusters[i][thisPoint].y > (ord_trk[0].y - 5) || deltaClusters[i][thisPoint].y < (ord_trk[ ord_trk.size() - 1 ].y + 5) )  {
-							deltaClusters[i][thisPoint].cid = 10;
-							continue;
+							//~ deltaClusters[i][thisPoint].cid = 10;
+							//~ continue;
+							setCID( deltaClusters[i], 10 );
+							done = true;
+							break;
 						}
 						// if we pass the last two if statements, then we have a good candidate
-						if (firstPassingPoint) {
-							cout << "Number of passing delta rays: " << ++passingDeltaRays << "\n";
-							firstPassingPoint = false;
-						}
-						deltaClusters[i][thisPoint].cid = 5;
+						//~ deltaClusters[i][thisPoint].cid = 5;
+						cout << "Number of passing delta rays: " << ++passingDeltaRays << "\n";
+						setCID( deltaClusters[i], 5 );
+						done = true;
+						break;
 					}
 				}
-			}			
-		}
+			}				//somehow make all points cid = 10 and leave when I have a cut
+		}					
 	}
 }
 
+cout << "delta points: " << delta_points.size() << endl;
+cout << "muon: " << final_muon.size() << endl;
 
+
+newDelta DRays;
+for (int i = 0; i < deltaClusters.size(); i++)
+{
+	DRays.storeDelta( deltaClusters[i] );
+}
+DRays.LOG();
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 // WRITING TTREE AND WHATNOT ///////////////////////////////////////////////////////////////////////
@@ -584,19 +651,14 @@ int passingDeltaRays = 0;
 nHits = *getHits;
 tempEntry = *grabEntry;
 
-
-cout << "delta points: " << delta_points.size() << endl;
-cout << "muon: " << final_muon.size() << endl;
-
 int pointshift = 0;
 for (int i = 0; i < deltaClusters.size(); i++) {
-	
 	for (int iPoint = 0; iPoint < deltaClusters[i].size(); ++iPoint)
 	{
 		tempX[pointshift] = deltaClusters[i][iPoint].x;
 		tempY[pointshift] = deltaClusters[i][iPoint].y;		
 		tempZ[pointshift] = deltaClusters[i][iPoint].z;
-		tempID[pointshift] = deltaClusters[i][0].cid;
+		tempID[pointshift] = deltaClusters[i][iPoint].cid;
 		isDelta[pointshift] = 1;
 		++pointshift;
 	}
@@ -829,4 +891,13 @@ PCAResults DoPCA(const PointCloud &points) {
 	results.eVals = outputEigenValues;
 	results.eVecs = outputEigenVecs;
 	return results;
+}
+
+void setCID( track_def &eliminate, int newCID )
+{
+	for (int i = 0; i < eliminate.size(); i++)
+	{
+		eliminate[i].cid = newCID;
+	}
+	
 }
