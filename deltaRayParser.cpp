@@ -134,6 +134,7 @@ class newDelta {
 			
 		};
 		
+		
 		void LOG() {
 			cout << "\n==========\nBEGIN LOG\n==========\n\n"
 			<< "Final number of passing delta rays: " << finalDeltas.size() << endl
